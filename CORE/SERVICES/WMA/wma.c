@@ -24797,6 +24797,7 @@ static inline void wma_free_wow_ptrn(tp_wma_handle wma, u_int8_t ptrn_id)
 }
 
 /* Converts wow wakeup reason code to text format */
+#ifdef WLAN_DEBUG
 static const u8 *wma_wow_wake_reason_str(A_INT32 wake_reason, tp_wma_handle wma)
 {
 	switch (wake_reason) {
@@ -24897,6 +24898,7 @@ static const u8 *wma_wow_wake_reason_str(A_INT32 wake_reason, tp_wma_handle wma)
 
 	return "unknown";
 }
+#endif
 
 static void wma_beacon_miss_handler(tp_wma_handle wma, u_int32_t vdev_id,
 				    uint32_t rssi)
@@ -26790,6 +26792,7 @@ static inline int wma_get_wow_bus_suspend(tp_wma_handle wma) {
 	return adf_os_atomic_read(&wma->is_wow_bus_suspended);
 }
 
+#ifdef WLAN_DEBUG
 static const u8 *wma_wow_wakeup_event_str(WOW_WAKE_EVENT_TYPE event)
 {
 	switch (event) {
@@ -26863,6 +26866,7 @@ static const u8 *wma_wow_wakeup_event_str(WOW_WAKE_EVENT_TYPE event)
 		return "UNSPECIFIED_EVENT";
 	}
 }
+#endif
 
 /**
  * wma_add_wow_wakeup_event() - Update WOW wakeup event masks

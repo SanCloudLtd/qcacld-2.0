@@ -56,6 +56,7 @@
 //Ms to Micro Sec
 #define MS_TO_MUS(x)   ((x)*1000)
 
+#ifdef WLAN_DEBUG
 static tANI_U8* hdd_getActionString(tANI_U16 MsgType)
 {
     switch (MsgType)
@@ -82,6 +83,7 @@ static tANI_U8* hdd_getActionString(tANI_U16 MsgType)
            return ("UNKNOWN");
      }
 }
+#endif
 
 #ifdef WLAN_FEATURE_P2P_DEBUG
 #define MAX_P2P_ACTION_FRAME_TYPE 9
