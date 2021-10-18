@@ -193,9 +193,6 @@ extern int rx_completion_task(void *param);
  */
 static inline int hif_start_rx_completion_thread(HIF_SDIO_DEVICE *pDev)
 {
-#ifdef CONFIG_PERF_NON_QC_PLATFORM
-    struct sched_param param = {.sched_priority = 99};
-#endif
 	if (!pDev->pRecvTask->rx_completion_task) {
 		pDev->pRecvTask->rx_completion_shutdown = 0;
 		pDev->pRecvTask->rx_completion_task = kthread_create(rx_completion_task,
@@ -204,6 +201,7 @@ static inline int hif_start_rx_completion_thread(HIF_SDIO_DEVICE *pDev)
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 9, 0)
                 sched_set_fifo(pDev->pRecvTask->rx_completion_task);
 #else
+                struct sched_param param = {.sched_priority = 99};
                 sched_setscheduler(pDev->pRecvTask->rx_completion_task, SCHED_FIFO, &param);
 #endif
 #endif

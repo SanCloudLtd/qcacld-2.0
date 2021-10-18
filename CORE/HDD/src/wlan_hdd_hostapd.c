@@ -5263,7 +5263,6 @@ static int __iw_softap_set_var_int_get_char(struct net_device *dev,
 			struct iw_request_info *info,
 			union iwreq_data *wrqu, char *extra)
 {
-	int *value = (int *)extra;
 	int ret = 0; /* success */
 	int num_args;
 	hdd_adapter_t *padapter = WLAN_HDD_GET_PRIV_PTR(dev);
@@ -5282,6 +5281,7 @@ static int __iw_softap_set_var_int_get_char(struct net_device *dev,
 	{
 #ifdef AUDIO_MULTICAST_AGGR_SUPPORT
 		case QCSAP_ADD_MULTICAST_GROUP:
+			int *value = (int *)extra;
 			ret = wlan_hdd_add_multicast_grp(padapter, value, wrqu, num_args);
 			if (ret < 0) {
 				hddLog(LOGW, FL("add_multicast_group failed"));

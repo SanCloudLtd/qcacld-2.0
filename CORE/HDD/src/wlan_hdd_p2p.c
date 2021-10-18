@@ -3369,7 +3369,6 @@ void __hdd_indicate_mgmt_frame(hdd_adapter_t *pAdapter,
                 vos_mem_compare(&pbFrames[WLAN_HDD_PUBLIC_ACTION_FRAME_OFFSET+2], SIR_MAC_P2P_OUI, SIR_MAC_P2P_OUI_SIZE))
             // P2P action frames
             {
-                u8 *macFrom = &pbFrames[WLAN_HDD_80211_FRM_DA_OFFSET+6];
                 actionFrmType = pbFrames[WLAN_HDD_PUBLIC_ACTION_FRAME_TYPE_OFFSET];
                 hddLog(LOG1, "Rx Action Frame %u", actionFrmType);
 #ifdef WLAN_FEATURE_P2P_DEBUG
@@ -3377,14 +3376,14 @@ void __hdd_indicate_mgmt_frame(hdd_adapter_t *pAdapter,
                 {
                     hddLog(VOS_TRACE_LEVEL_ERROR,"[P2P] unknown[%d] <--- OTA"
                            " from " MAC_ADDRESS_STR, actionFrmType,
-                           MAC_ADDR_ARRAY(macFrom));
+                           MAC_ADDR_ARRAY(&pbFrames[WLAN_HDD_80211_FRM_DA_OFFSET+6]));
                 }
                 else
                 {
                     hddLog(VOS_TRACE_LEVEL_ERROR,"[P2P] %s <--- OTA"
                            " from " MAC_ADDRESS_STR,
                            p2p_action_frame_type[actionFrmType],
-                           MAC_ADDR_ARRAY(macFrom));
+                           MAC_ADDR_ARRAY(&pbFrames[WLAN_HDD_80211_FRM_DA_OFFSET+6]));
                     if( (actionFrmType == WLAN_HDD_PROV_DIS_REQ) &&
                         (globalP2PConnectionStatus == P2P_NOT_ACTIVE) )
                     {

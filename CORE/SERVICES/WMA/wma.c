@@ -10957,8 +10957,6 @@ static VOS_STATUS wma_set_mcc_channel_time_quota
 	struct sAniSirGlobal *pMac = NULL;
 	wmi_resmgr_set_chan_time_quota_cmd_fixed_param *cmdTQ = NULL;
 	wmi_resmgr_chan_time_quota chan_quota;
-	u_int32_t channel1 = adapter_1_chan_number;
-	u_int32_t channel2 = adapter_2_chan_number;
 	u_int32_t quota_chan1 = adapter_1_quota;
 	/* Knowing quota of 1st chan., derive quota for 2nd chan. */
 	u_int32_t quota_chan2 = 100 - quota_chan1;
@@ -10969,8 +10967,8 @@ static VOS_STATUS wma_set_mcc_channel_time_quota
 
 	WMA_LOGD("%s: Channel1:%d, freq1:%dMHz, Quota1:%dms, "
 		"Channel2:%d, freq2:%dMHz, Quota2:%dms", __func__,
-		channel1, chan1_freq, quota_chan1, channel2, chan2_freq,
-		quota_chan2);
+		adapter_1_chan_number, chan1_freq, quota_chan1,
+		adapter_2_chan_number, chan2_freq, quota_chan2);
 
 	if (!wma) {
 		WMA_LOGE("%s:NULL wma ptr. Exiting", __func__);
