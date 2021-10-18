@@ -319,6 +319,10 @@ dfs_bin5_check(struct ath_dfs *dfs)
       }
    }
 
+   (void)average_width;
+   (void)total_width;
+   (void)average_diff;
+   (void)total_diff;
    return 0;
 }
 
