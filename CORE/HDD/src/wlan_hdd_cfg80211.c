@@ -5224,7 +5224,11 @@ static int hdd_extscan_passpoint_fill_network_list(
 			hddLog(LOGE, FL("attr realm failed"));
 			return -EINVAL;
 		}
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 11, 0))
+		len = nla_strscpy(req_msg->networks[index].realm,
+#else
 		len = nla_strlcpy(req_msg->networks[index].realm,
+#endif
 				  network[PARAM_REALM],
 				  SIR_PASSPOINT_REALM_LEN);
 		/* Don't send partial realm to firmware */
@@ -17542,7 +17546,13 @@ int wlan_hdd_cfg80211_update_apies(hdd_adapter_t* pHostapdAdapter)
                           WLAN_EID_INTERWORKING);
 
     wlan_hdd_add_extra_ie(pHostapdAdapter, genie, &total_ielen,
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5,15,0))
                           WLAN_EID_VHT_TX_POWER_ENVELOPE);
+#else
+                          WLAN_EID_TX_POWER_ENVELOPE);
+#endif
+    wlan_hdd_add_extra_ie(pHostapdAdapter, genie, &total_ielen,
+                          WLAN_ELEMID_RSNXE);
     if (0 != wlan_hdd_add_ie(pHostapdAdapter, genie,
                               &total_ielen, WPS_OUI_TYPE, WPS_OUI_TYPE_SIZE))
     {
@@ -17624,7 +17634,8 @@ int wlan_hdd_cfg80211_update_apies(hdd_adapter_t* pHostapdAdapter)
     hddLog(LOGE, FL("qcdbg, probe resp ie len:%d"), proberesp_ies_len);
     wlan_hdd_add_sap_obss_scan_ie(pHostapdAdapter, proberesp_ies,
                                   &proberesp_ies_len);
-
+    wlan_hdd_add_extra_ie(pHostapdAdapter, proberesp_ies, &proberesp_ies_len,
+                          WLAN_ELEMID_RSNXE);
     if (test_bit(SOFTAP_BSS_STARTED, &pHostapdAdapter->event_flags)) {
         updateIE.ieBufferlength = proberesp_ies_len;
         updateIE.pAdditionIEBuffer = proberesp_ies;
@@ -24615,6 +24626,28 @@ int wlan_hdd_cfg80211_set_ie(hdd_adapter_t *pAdapter,
                 } else {
                     hddLog(VOS_TRACE_LEVEL_FATAL, "UNKNOWN EID: %X", genie[0]);
                 }
+                break;
+
+            case WLAN_ELEMID_RSNXE:
+                hddLog (VOS_TRACE_LEVEL_INFO, "%s Set RSNXE(len %d)",
+                        __func__, eLen + 2);
+
+                if (SIR_MAC_MAX_ADD_IE_LENGTH <
+                        (pWextState->assocAddIE.length + eLen)) {
+                   hddLog(VOS_TRACE_LEVEL_FATAL, "Cannot accommodate assocAddIE"
+                                                  "Need bigger buffer space");
+                   VOS_ASSERT(0);
+                   return -ENOMEM;
+                }
+                memcpy(pWextState->assocAddIE.addIEdata +
+                       pWextState->assocAddIE.length,
+                       genie - 2, eLen + 2);
+                pWextState->assocAddIE.length += eLen + 2;
+
+                pWextState->roamProfile.pAddIEAssoc =
+                                pWextState->assocAddIE.addIEdata;
+                pWextState->roamProfile.nAddIEAssocLength =
+                                pWextState->assocAddIE.length;
                 break;
 
             default:

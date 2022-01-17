@@ -8,16 +8,11 @@ endif
 
 # This branch builds for SDIO devices by default
 ifndef CONFIG_ROME_IF
-	CONFIG_CLD_HL_SDIO_CORE := y
-endif
-
-ifeq ($(CONFIG_CLD_HL_SDIO_CORE), y)
-	CONFIG_QCA_WIFI_SDIO := 1
 	CONFIG_ROME_IF = sdio
 endif
 
-ifndef CONFIG_ROME_IF
-	CONFIG_ROME_IF = pci
+ifeq ($(CONFIG_ROME_IF), sdio)
+	CONFIG_QCA_WIFI_SDIO := 1
 endif
 
 ifeq ($(KERNEL_BUILD),1)
@@ -1222,7 +1217,9 @@ ifeq ($(CONFIG_NON_QC_PLATFORM), y)
 ifeq ($(CONFIG_FW_RAM_DUMP_TO_PROC), y)
 CDEFINES += -DFW_RAM_DUMP_TO_PROC
 else
+ifneq ($(CONFIG_ARCH_MESON), y)
 CDEFINES += -DFW_RAM_DUMP_TO_FILE
+endif
 endif
 endif
 
