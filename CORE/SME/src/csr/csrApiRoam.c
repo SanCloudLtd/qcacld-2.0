@@ -9828,6 +9828,11 @@ void csrRoamJoinedStateMsgProcessor( tpAniSirGlobal pMac, void *pMsgBuf )
             smsLog( pMac, LOG1, FL("ASSOCIATION confirmation can be given to upper layer "));
             pUpperLayerAssocCnf = (tSirSmeAssocIndToUpperLayerCnf *)pMsgBuf;
             status = csrRoamGetSessionIdFromBSSID( pMac, (tCsrBssid *)pUpperLayerAssocCnf->bssId, &sessionId );
+            if (!HAL_STATUS_SUCCESS(status))
+            {
+                smsLog(pMac, LOGE, FL("Failed to get SessionId"));
+                return;
+            }
             pSession = CSR_GET_SESSION(pMac, sessionId);
 
             if(!pSession)
@@ -17915,10 +17920,15 @@ eHalStatus csrGetSnr(tpAniSirGlobal pMac,
    if (NULL == pMsg )
    {
       smsLog(pMac, LOGE, "%s: failed to allocate mem for req",__func__);
-      return status;
+      return eHAL_STATUS_FAILURE;
    }
 
-   csrRoamGetSessionIdFromBSSID(pMac, (tCsrBssid *)bssId, &sessionId);
+   status = csrRoamGetSessionIdFromBSSID(pMac, (tCsrBssid *)bssId, &sessionId);
+   if (!HAL_STATUS_SUCCESS(status))
+   {
+      smsLog(pMac, LOGE, FL("Failed to get SessionId"));
+      return eHAL_STATUS_FAILURE;
+   }
 
    pMsg->msgType = pal_cpu_to_be16((tANI_U16)eWNI_SME_GET_SNR_REQ);
    pMsg->msgLen = (tANI_U16)sizeof(tAniGetSnrReq);
