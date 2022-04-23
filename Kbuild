@@ -801,14 +801,13 @@ VOSS_OBJS :=    $(VOSS_SRC_DIR)/vos_api.o \
 		$(VOSS_SRC_DIR)/vos_types.o \
                 $(VOSS_SRC_DIR)/vos_utils.o
 
-ifeq ($(CONFIG_CLD_REGDB),y)
-VOSS_OBJS += $(VOSS_SRC_DIR)/vos_regdb.o
-endif
-
 ifeq ($(BUILD_DIAG_VERSION),1)
 VOSS_OBJS += $(VOSS_SRC_DIR)/vos_diag.o
 endif
 
+ifeq ($(CONFIG_CLD_REGDB),y)
+VOSS_OBJS += $(VOSS_SRC_DIR)/vos_regdb.o
+endif
 ########### BMI ###########
 BMI_DIR := CORE/SERVICES/BMI
 
@@ -1133,10 +1132,6 @@ CDEFINES +=     -DWLAN_FEATURE_MBSSID \
 		-DWLAN_FEATURE_SAP_TO_FOLLOW_STA_CHAN
 endif
 
-ifeq ($(CONFIG_CLD_REGDB), y)
-CDEFINES +=     -DCLD_REGDB
-endif
-
 ifeq ($(CONFIG_QCA_WIFI_SDIO), 1)
 CDEFINES +=     -DCONFIG_HL_SUPPORT \
                 -DCONFIG_AR6320_SUPPORT \
@@ -1216,10 +1211,6 @@ endif
 ifeq ($(CONFIG_NON_QC_PLATFORM), y)
 ifeq ($(CONFIG_FW_RAM_DUMP_TO_PROC), y)
 CDEFINES += -DFW_RAM_DUMP_TO_PROC
-else
-ifneq ($(CONFIG_ARCH_MESON), y)
-CDEFINES += -DFW_RAM_DUMP_TO_FILE
-endif
 endif
 endif
 
@@ -1904,6 +1895,14 @@ endif
 
 ifeq ($(CONFIG_SPECTRAL_SCAN), y)
 CDEFINES += -DWLAN_SPECTRAL_SCAN
+endif
+
+ifeq ($(CONFIG_CLD_REGDB), y)
+CDEFINES += -DCLD_REGDB
+endif
+
+ifeq ($(CONFIG_FORCE_CRYPTO_INTERNAL), y)
+CDEFINES += -DFORCE_CRYPTO_INTERNAL
 endif
 
 # Module information used by KBuild framework

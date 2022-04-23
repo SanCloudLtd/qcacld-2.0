@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 2011-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2020, 2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -910,6 +911,36 @@ void hdd_wlan_dump_stats(hdd_adapter_t *pAdapter, int value)
     }
 }
 
+#ifdef CLD_REGDB
+void hdd_wlan_dump_cld_regdb(hdd_adapter_t *adapter)
+{
+	hdd_context_t *hdd_ctx;
+	struct wiphy *wiphy;
+	uint32_t i;
+	uint32_t j;
+	struct ieee80211_supported_band *band;
+
+	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+
+	wiphy = hdd_ctx->wiphy;
+	for (i = 0; i < IEEE80211_NUM_BANDS; i++) {
+		band = wiphy->bands[i];
+		if (!band)
+			continue;
+
+		for (j = 0; j < band->n_channels; j++)
+			pr_info("[CLD-REGDB-DEBUG]: freq %d flags 0x%x\n",
+				band->channels[j].center_freq,
+				band->channels[j].flags);
+	}
+}
+#else
+void hdd_wlan_dump_cld_regdb(hdd_adapter_t *adapter)
+{
+
+}
+#endif
+
 /**---------------------------------------------------------------------------
 
   \brief hdd_wlan_get_version() -
@@ -933,10 +964,6 @@ void hdd_wlan_get_version(hdd_adapter_t *pAdapter, union iwreq_data *wrqu,
 
     hdd_context_t *pHddContext;
     int i = 0;
-#ifdef CLD_REGDB
-    struct wiphy *wiphy = NULL;
-    int j;
-#endif
 
     pHddContext = WLAN_HDD_GET_CTX(pAdapter);
     if (!pHddContext) {
@@ -985,19 +1012,7 @@ void hdd_wlan_get_version(hdd_adapter_t *pAdapter, union iwreq_data *wrqu,
                 pHWversion);
     }
 
-#ifdef CLD_REGDB
-    wiphy = pHddContext->wiphy;
-    for (i = 0; i < IEEE80211_NUM_BANDS; i++) {
-        if (NULL == wiphy->bands[i])
-            continue;
-
-        for (j = 0; j < wiphy->bands[i]->n_channels; j++) {
-            struct ieee80211_supported_band *band = wiphy->bands[i];
-            printk("[CLD-REGDB-DEBUG]: channel %d flags 0x%x\n",
-                   band->channels[j].center_freq, band->channels[j].flags);
-        }
-    }
-#endif
+    hdd_wlan_dump_cld_regdb(pAdapter);
 
 error:
     return;

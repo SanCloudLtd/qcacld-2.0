@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2019, 2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -9066,6 +9067,7 @@ static void hdd_update_tgt_vht_cap(hdd_context_t *hdd_ctx,
     tANI_U32 value = 0;
     hdd_config_t *pconfig = hdd_ctx->cfg_ini;
     tANI_U32 temp = 0;
+    tANI_U32 enable_tx_stbc;
 
     /* Get the current MPDU length */
     status = ccmCfgGetInt(hdd_ctx->hHal, WNI_CFG_VHT_MAX_MPDU_LENGTH, &value);
@@ -9242,26 +9244,24 @@ static void hdd_update_tgt_vht_cap(hdd_context_t *hdd_ctx,
     }
 
     /* Get VHT TX STBC cap */
-    status = ccmCfgGetInt(hdd_ctx->hHal, WNI_CFG_VHT_TXSTBC, &value);
-
-    if (status != eHAL_STATUS_SUCCESS) {
-        VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
-                  "%s: could not get VHT TX STBC",
-                  __func__);
-        value = 0;
-    }
+    enable_tx_stbc = pconfig->enableTxSTBC;
+    if (!(cfg->vht_tx_stbc && pconfig->enable2x2))
+        enable_tx_stbc = 0;
+    VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_DEBUG,
+			  "%s: vht stbc ini enableTxSTBC %x,target %x, 2x2 %d",
+			  __func__, pconfig->enableTxSTBC, cfg->vht_tx_stbc,
+			  pconfig->enable2x2);
 
     /* VHT TX STBC cap */
-    if (value && !cfg->vht_tx_stbc) {
-        status = ccmCfgSetInt(hdd_ctx->hHal, WNI_CFG_VHT_TXSTBC,
-                              cfg->vht_tx_stbc, NULL,
-                              eANI_BOOLEAN_FALSE);
 
-        if (status == eHAL_STATUS_FAILURE) {
-            VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_FATAL,
-                      "%s: could not set the VHT TX STBC to CCM",
-                      __func__);
-        }
+    status = ccmCfgSetInt(hdd_ctx->hHal, WNI_CFG_VHT_TXSTBC,
+                          enable_tx_stbc, NULL,
+                          eANI_BOOLEAN_FALSE);
+
+    if (status == eHAL_STATUS_FAILURE) {
+        VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_FATAL,
+                  "%s: could not set the VHT TX STBC to CCM",
+                  __func__);
     }
 
     /* Get VHT RX STBC cap */
@@ -17423,9 +17423,8 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
       }
 
 #ifdef CLD_REGDB
-      if ((wiphy) && country_code) {
-          regulatory_hint(wiphy, country_code);
-      }
+     if (wiphy && country_code)
+         regulatory_hint(wiphy, country_code);
 #endif
 
       status = wlan_hdd_reg_init(pHddCtx);
@@ -17499,12 +17498,11 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
    }
 
 #ifdef CLD_REGDB
-   if (country_code)
-   {
-       pHddCtx->reg.alpha2[0] = country_code[0];
-       pHddCtx->reg.alpha2[1] = country_code[1];
-       pHddCtx->reg.cc_src = NL80211_REGDOM_SET_BY_DRIVER;
-       pHddCtx->reg.dfs_region = 0;
+   if (country_code) {
+      pHddCtx->reg.alpha2[0] = country_code[0];
+      pHddCtx->reg.alpha2[1] = country_code[1];
+      pHddCtx->reg.cc_src = NL80211_REGDOM_SET_BY_DRIVER;
+      pHddCtx->reg.dfs_region = 0;
    }
 #endif
 
