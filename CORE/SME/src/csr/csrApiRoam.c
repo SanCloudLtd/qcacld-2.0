@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -3606,8 +3606,8 @@ eHalStatus csrRoamPrepareBssConfig(tpAniSirGlobal pMac, tCsrRoamProfile *pProfil
 
         if (((pBssConfig->uCfgDot11Mode == eCSR_CFG_DOT11_MODE_11N)  ||
                          (pBssConfig->uCfgDot11Mode == eCSR_CFG_DOT11_MODE_11AC)) &&
-                         ((pBssConfig->qosType != eCSR_MEDIUM_ACCESS_WMM_eDCF_DSCP) ||
-                          (pBssConfig->qosType != eCSR_MEDIUM_ACCESS_11e_HCF) ||
+                         ((pBssConfig->qosType != eCSR_MEDIUM_ACCESS_WMM_eDCF_DSCP) &&
+                          (pBssConfig->qosType != eCSR_MEDIUM_ACCESS_11e_HCF) &&
                           (pBssConfig->qosType != eCSR_MEDIUM_ACCESS_11e_eDCF) ))
         {
             //Joining BSS is 11n capable and WMM is disabled on AP.
@@ -5583,7 +5583,7 @@ static eHalStatus csrRoamSaveSecurityRspIE(tpAniSirGlobal pMac, tANI_U32 session
                         + 2; //reserved
                     if( pIesLocal->RSN.pmkid_count )
                     {
-                        nIeLen += 2 + pIesLocal->RSN.pmkid_count * 4;  //pmkid
+                        nIeLen += 2 + pIesLocal->RSN.pmkid_count * 16;  //pmkid
                     }
                     //nIeLen doesn't count EID and length fields
                     pSession->pWpaRsnRspIE = vos_mem_malloc(nIeLen + 2);
@@ -5624,9 +5624,15 @@ static eHalStatus csrRoamSaveSecurityRspIE(tpAniSirGlobal pMac, tANI_U32 session
                             pIeBuf += pIesLocal->RSN.akm_suite_cnt * 4;
                         }
                         //copy the rest
-                        vos_mem_copy(pIeBuf,
-                                     pIesLocal->RSN.akm_suite + pIesLocal->RSN.akm_suite_cnt * 4,
-                                     2 + pIesLocal->RSN.pmkid_count * 4);
+                        if( pIesLocal->RSN.pmkid_count )
+                        {
+                            vos_mem_copy(pIeBuf, &pIesLocal->RSN.pmkid_count, 2);
+                            pIeBuf += 2;
+                            vos_mem_copy(pIeBuf,
+                                         pIesLocal->RSN.pmkid,
+                                         pIesLocal->RSN.pmkid_count * 16);
+                            pIeBuf += pIesLocal->RSN.pmkid_count * 16;
+                        }
                         pSession->nWpaRsnRspIeLength = nIeLen + 2;
                     }
                 }
@@ -7382,7 +7388,7 @@ eHalStatus csrRoamCopyConnectedProfile(tpAniSirGlobal pMac, tANI_U32 sessionId, 
     do
     {
         vos_mem_set(pDstProfile, sizeof(tCsrRoamProfile), 0);
-        if(pSrcProfile->bssid)
+        if(pSrcProfile)
         {
             pDstProfile->BSSIDs.bssid = vos_mem_malloc(sizeof(tCsrBssid));
             if ( NULL == pDstProfile->BSSIDs.bssid )
@@ -9830,11 +9836,6 @@ void csrRoamJoinedStateMsgProcessor( tpAniSirGlobal pMac, void *pMsgBuf )
             smsLog( pMac, LOG1, FL("ASSOCIATION confirmation can be given to upper layer "));
             pUpperLayerAssocCnf = (tSirSmeAssocIndToUpperLayerCnf *)pMsgBuf;
             status = csrRoamGetSessionIdFromBSSID( pMac, (tCsrBssid *)pUpperLayerAssocCnf->bssId, &sessionId );
-            if (!HAL_STATUS_SUCCESS(status))
-            {
-                smsLog(pMac, LOGE, FL("Failed to get SessionId"));
-                return;
-            }
             pSession = CSR_GET_SESSION(pMac, sessionId);
 
             if(!pSession)
@@ -11001,6 +11002,54 @@ static eCsrAuthType csr_translate_akm_type(enum ani_akm_type akm_type)
 	return csr_akm_type;
 }
 
+/**
+ * csr_roam_chk_swt_ch_ind() - Send roam info to SME layer callback
+ * @mac: Poitner to MAC layer context
+ * @msg: Message from MAC layer
+ *
+ * Return: None
+ */
+static void csr_roam_chk_swt_ch_ind(tpAniSirGlobal mac, tSirSmeRsp *msg)
+{
+	tCsrRoamInfo roam_info;
+	tCsrRoamSession *session = NULL;
+	tpSirSmeSwitchChannelInd switch_chn;
+	tANI_U32 session_id;
+	eHalStatus status  = eHAL_STATUS_SUCCESS;
+
+	smsLog(mac, LOGW, FL("eWNI_SME_SWITCH_CHL_REQ from SME"));
+	switch_chn = (tpSirSmeSwitchChannelInd)msg;
+
+	/*
+	 * Update with the new channel id.
+	 * The channel id is hidden in the statusCode.
+	 */
+	status = csrRoamGetSessionIdFromBSSID(mac,
+					      (tCsrBssid *)switch_chn->bssId,
+					      &session_id);
+	if (HAL_STATUS_SUCCESS(status)) {
+		session = CSR_GET_SESSION(mac, session_id);
+		if (!session) {
+			smsLog(mac, LOGE, FL("  session %d not found "),
+			       session_id);
+			return;
+		}
+		session->connectedProfile.operationChannel =
+					(tANI_U8)switch_chn->newChannelId;
+		if (session->pConnectBssDesc) {
+			session->pConnectBssDesc->channelId =
+					(tANI_U8)switch_chn->newChannelId;
+		}
+
+		vos_mem_set(&roam_info, sizeof(tCsrRoamInfo), 0);
+		roam_info.chan_info.chan_id = switch_chn->newChannelId;
+
+		status = csrRoamCallCallback(mac, session_id, &roam_info, 0,
+					     eCSR_ROAM_STA_CHANNEL_SWITCH,
+					     eCSR_ROAM_RESULT_NONE);
+	}
+}
+
 void csrRoamCheckForLinkStatusChange( tpAniSirGlobal pMac, tSirSmeRsp *pSirMsg )
 {
 
@@ -11019,7 +11068,6 @@ void csrRoamCheckForLinkStatusChange( tpAniSirGlobal pMac, tSirSmeRsp *pSirMsg )
     eHalStatus status;
     tANI_U32 sessionId = CSR_SESSION_ID_INVALID;
     tCsrRoamSession *pSession = NULL;
-    tpSirSmeSwitchChannelInd pSwitchChnInd;
     tSmeMaxAssocInd *pSmeMaxAssocInd;
     tSmeCmd *pCommand = NULL;
     tSirMacStatusCodes mac_status_code = eSIR_MAC_SUCCESS_STATUS;
@@ -11331,27 +11379,7 @@ void csrRoamCheckForLinkStatusChange( tpAniSirGlobal pMac, tSirSmeRsp *pSirMsg )
            break;
 
         case eWNI_SME_SWITCH_CHL_REQ:        // in case of STA, the SWITCH_CHANNEL originates from its AP
-            smsLog( pMac, LOGW, FL("eWNI_SME_SWITCH_CHL_REQ from SME"));
-            pSwitchChnInd = (tpSirSmeSwitchChannelInd)pSirMsg;
-            //Update with the new channel id.
-            //The channel id is hidden in the statusCode.
-            status = csrRoamGetSessionIdFromBSSID( pMac, (tCsrBssid *)pSwitchChnInd->bssId, &sessionId );
-            if( HAL_STATUS_SUCCESS( status ) )
-            {
-                pSession = CSR_GET_SESSION( pMac, sessionId );
-                if(!pSession)
-                {
-                    smsLog(pMac, LOGE, FL("  session %d not found "), sessionId);
-                    if (pRoamInfo)
-                        vos_mem_free(pRoamInfo);
-                    return;
-                }
-                pSession->connectedProfile.operationChannel = (tANI_U8)pSwitchChnInd->newChannelId;
-                if(pSession->pConnectBssDesc)
-                {
-                    pSession->pConnectBssDesc->channelId = (tANI_U8)pSwitchChnInd->newChannelId;
-                }
-            }
+            csr_roam_chk_swt_ch_ind(pMac, pSirMsg);
             break;
 
         case eWNI_SME_DEAUTH_RSP:
@@ -15241,7 +15269,7 @@ eHalStatus csrSendJoinReqMsg( tpAniSirGlobal pMac, tANI_U32 sessionId, tSirBssDe
         }
         if (pProfile->MFPEnabled &&
            !(pProfile->MFPRequired) && ((pIes->RSN.present) &&
-           (!(pIes->RSN.RSN_Cap[0] >> 7) & 0x1)))
+           (!((pIes->RSN.RSN_Cap[0] >> 7) & 0x1))))
             dwTmp = pal_cpu_to_be32(eSIR_ED_NONE);
         vos_mem_copy(pBuf, &dwTmp, sizeof(tANI_U32));
         pBuf += sizeof(tANI_U32);
@@ -17941,15 +17969,10 @@ eHalStatus csrGetSnr(tpAniSirGlobal pMac,
    if (NULL == pMsg )
    {
       smsLog(pMac, LOGE, "%s: failed to allocate mem for req",__func__);
-      return eHAL_STATUS_FAILURE;
+      return status;
    }
 
-   status = csrRoamGetSessionIdFromBSSID(pMac, (tCsrBssid *)bssId, &sessionId);
-   if (!HAL_STATUS_SUCCESS(status))
-   {
-      smsLog(pMac, LOGE, FL("Failed to get SessionId"));
-      return eHAL_STATUS_FAILURE;
-   }
+   csrRoamGetSessionIdFromBSSID(pMac, (tCsrBssid *)bssId, &sessionId);
 
    pMsg->msgType = pal_cpu_to_be16((tANI_U16)eWNI_SME_GET_SNR_REQ);
    pMsg->msgLen = (tANI_U16)sizeof(tAniGetSnrReq);
@@ -18947,7 +18970,7 @@ eHalStatus csrRoamOffloadScan(tpAniSirGlobal pMac, tANI_U8 sessionId,
                        vos_nv_getChannelEnabledState(*ChannelList),
                        *ChannelList,
                        num_channels);
-            ChannelList++;
+              ChannelList++;
         }
         pRequestBuf->ConnectedNetwork.ChannelCount = num_channels;
         /* If the profile changes as to what it was earlier, inform the

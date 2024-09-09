@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2015-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -33,7 +34,12 @@
 #include <net/cnss.h>
 #endif
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 7, 0))
+#define PM_QOS_CPU_DMA_LATENCY 1
+#endif
+
 #define DISABLE_KRAIT_IDLE_PS_VAL    1
+
 
 #if defined(WLAN_OPEN_SOURCE) && !defined(CONFIG_CNSS)
 #include <linux/device.h>
@@ -111,7 +117,7 @@ static inline void vos_pm_wake_lock(vos_wake_lock_t *lock)
 	__pm_stay_awake(lock->priv);
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0)
 static inline void vos_pm_wake_lock_timeout(vos_wake_lock_t *lock,
 					    ulong msec)
 {

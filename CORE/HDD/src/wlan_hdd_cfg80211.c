@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -1640,8 +1640,11 @@ static int __is_driver_dfs_capable(struct wiphy *wiphy,
         return -EPERM;
     }
 
-#if (LINUX_VERSION_CODE > KERNEL_VERSION(3,4,0)) || \
+#if (LINUX_VERSION_CODE > KERNEL_VERSION(4,17,0)) || \
     defined (DFS_MASTER_OFFLOAD_IND_SUPPORT) || defined(WITH_BACKPORTS)
+    dfs_capability = wiphy_ext_feature_isset(wiphy,
+                                             NL80211_EXT_FEATURE_DFS_OFFLOAD);
+#else
     dfs_capability = !!(wiphy->flags & WIPHY_FLAG_DFS_OFFLOAD);
 #endif
 
@@ -16506,6 +16509,8 @@ static void wlan_hdd_cfg80211_set_wiphy_sae_feature(struct wiphy *wiphy,
 }
 #endif
 
+#define WLAN_HDD_MAX_NUM_CSA_COUNTERS 2
+
 /*
  * FUNCTION: wlan_hdd_cfg80211_init
  * This function is called by hdd_wlan_startup()
@@ -16783,8 +16788,12 @@ int wlan_hdd_cfg80211_init(struct device *dev,
     wiphy->vendor_events = wlan_hdd_cfg80211_vendor_events;
     wiphy->n_vendor_events = ARRAY_SIZE(wlan_hdd_cfg80211_vendor_events);
 
-#if (LINUX_VERSION_CODE > KERNEL_VERSION(3,4,0)) || \
+#if (LINUX_VERSION_CODE > KERNEL_VERSION(4,17,0)) || \
     defined (DFS_MASTER_OFFLOAD_IND_SUPPORT) || defined(WITH_BACKPORTS)
+    if (pCfg->enableDFSMasterCap) {
+        wiphy_ext_feature_set(wiphy, NL80211_EXT_FEATURE_DFS_OFFLOAD);
+    }
+#else
     if (pCfg->enableDFSMasterCap) {
         wiphy->flags |= WIPHY_FLAG_DFS_OFFLOAD;
     }
@@ -16798,6 +16807,7 @@ int wlan_hdd_cfg80211_init(struct device *dev,
 #ifdef CHANNEL_SWITCH_SUPPORTED
     wiphy->flags |= WIPHY_FLAG_HAS_CHANNEL_SWITCH;
 #endif
+    wiphy->max_num_csa_counters = WLAN_HDD_MAX_NUM_CSA_COUNTERS;
 
     if (pCfg->sub_20_channel_width)
         wiphy->flags |= WIPHY_FLAG_SUPPORTS_5_10_MHZ;
@@ -17561,11 +17571,12 @@ int wlan_hdd_cfg80211_update_apies(hdd_adapter_t* pHostapdAdapter)
     wlan_hdd_add_extra_ie(pHostapdAdapter, genie, &total_ielen,
                           WLAN_EID_INTERWORKING);
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5,15,0))
     wlan_hdd_add_extra_ie(pHostapdAdapter, genie, &total_ielen,
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(5,15,0))
-                          WLAN_EID_VHT_TX_POWER_ENVELOPE);
-#else
                           WLAN_EID_TX_POWER_ENVELOPE);
+#else
+    wlan_hdd_add_extra_ie(pHostapdAdapter, genie, &total_ielen,
+                          WLAN_EID_VHT_TX_POWER_ENVELOPE);
 #endif
     wlan_hdd_add_extra_ie(pHostapdAdapter, genie, &total_ielen,
                           IEEE80211_ELEMID_RSNXE);
@@ -19541,8 +19552,14 @@ static int wlan_hdd_cfg80211_del_beacon(struct wiphy *wiphy,
  *
  * Return: zero for success non-zero for failure
  */
+#ifdef CFG80211_SINGLE_NETDEV_MULTI_LINK_SUPPORT
+static int wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
+				     struct net_device *dev,
+				     unsigned int link_id)
+#else
 static int wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 					struct net_device *dev)
+#endif
 {
 	int ret;
 
@@ -20158,11 +20175,10 @@ static int wlan_hdd_cfg80211_change_bss (struct wiphy *wiphy,
 /* FUNCTION: wlan_hdd_change_country_code_cd
 *  to wait for country code completion
 */
-void* wlan_hdd_change_country_code_cb(void *pAdapter)
+void wlan_hdd_change_country_code_cb(void *pAdapter)
 {
     hdd_adapter_t *call_back_pAdapter = pAdapter;
     complete(&call_back_pAdapter->change_country_code);
-    return NULL;
 }
 
 /*
@@ -20325,7 +20341,6 @@ static int __wlan_hdd_cfg80211_change_iface(struct wiphy *wiphy,
                 hddLog(LOG1, FL("Setting country code from INI"));
                 init_completion(&pAdapter->change_country_code);
                 hstatus = sme_ChangeCountryCode(pHddCtx->hHal,
-                                     (void *)(tSmeChangeCountryCallback)
                                       wlan_hdd_change_country_code_cb,
                                       pConfig->apCntryCode, pAdapter,
                                       pHddCtx->pvosContext,
@@ -21883,7 +21898,7 @@ wlan_hdd_cfg80211_inform_bss_frame( hdd_adapter_t *pAdapter,
     hdd_context_t *pHddCtx;
     int status;
 #ifdef ANDROID
-    struct timespec64 ts;
+    struct timespec ts;
 #endif
     hdd_config_t *cfg_param = NULL;
 
@@ -25418,7 +25433,6 @@ disconnected:
     return result;
 }
 
-#ifdef WLAN_DEBUG
 /**
  * hdd_ieee80211_reason_code_to_str() - return string conversion of reason code
  * @reason: ieee80211 reason code.
@@ -25482,8 +25496,6 @@ static const char *hdd_ieee80211_reason_code_to_str(uint16_t reason)
 		return "Unknown";
 	}
 }
-#endif
-
 /*
  * FUNCTION: __wlan_hdd_cfg80211_disconnect
  * This function is used to issue a disconnect request to SME

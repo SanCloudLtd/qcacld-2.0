@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2002-2013, 2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -338,7 +339,7 @@ dfs_bin_pri_check(struct ath_dfs *dfs, struct dfs_filter *rf,
         u_int32_t searchpri, searchdur, searchrssi, deltapri = 0,deltapri1 = 0, deltapri2 = 0, deltadur, averagerefpri=0,MatchCount = 0;
         u_int32_t  delta_ts_variance, delta_time_stamps, prev_good_timestamp=0;
         int delayindex, dindex;
-        u_int32_t i, j=0, primargin, durmargin;
+        u_int32_t i, j=0, primargin, durmargin, highscore=score, highscoreindex=0;
         int numpulses=1;  //first pulse in the burst is most likely being filtered out based on maxfilterlen
         int priscorechk=1,numpulsetochk=2,primatch=0;
         int32_t sidx_min = DFS_BIG_SIDX;
@@ -395,7 +396,7 @@ dfs_bin_pri_check(struct ath_dfs *dfs, struct dfs_filter *rf,
          */
         DFS_DPRINTK(dfs, ATH_DEBUG_DFS2,
                 "refpri = %d high score = %d index = %d numpulses = %d\n",
-                refpri, score, 0, numpulses);
+                refpri, highscore, highscoreindex, numpulses);
    /* Count the other delay elements that have  pri and dur with in the
          * acceptable range from the reference one */
         for (i=0; i<dl->dl_numelems; i++) {
@@ -432,7 +433,7 @@ dfs_bin_pri_check(struct ath_dfs *dfs, struct dfs_filter *rf,
                  }
 
                 if ( primatch && ( deltadur < durmargin) ) {
-                    if ( (numpulses == 1)  ) {
+                    if (numpulses == 1) {
                         dl->dl_seq_num_second =
                                     dl->dl_elems[delayindex].de_seq_num;
                         /* update sidx min/max for false detection check later*/

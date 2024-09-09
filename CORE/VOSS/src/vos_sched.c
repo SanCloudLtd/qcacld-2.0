@@ -503,6 +503,9 @@ vos_sched_open
 )
 {
   VOS_STATUS  vStatus = VOS_STATUS_SUCCESS;
+#ifdef CONFIG_PERF_NON_QC_PLATFORM
+  struct sched_param param = {.sched_priority = 99};
+#endif
 /*-------------------------------------------------------------------------*/
   VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO_HIGH,
              "%s: Opening the VOSS Scheduler",__func__);
@@ -597,7 +600,6 @@ vos_sched_open
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 9, 0)
   sched_set_fifo(pSchedContext->TlshimRxThread);
 #else
-  struct sched_param param = {.sched_priority = 99};
   sched_setscheduler(pSchedContext->TlshimRxThread, SCHED_FIFO, &param);
 #endif
 #endif
@@ -1151,16 +1153,15 @@ VosWDThread
     {
       /* Post Msg to detect thread stuck */
       if (test_and_clear_bit(WD_WLAN_DETECT_THREAD_STUCK,
-                                   &pWdContext->wdEventFlag))
-      {
+                                   &pWdContext->wdEventFlag)) {
 
-        if (gpVosSchedContext &&
-            !test_bit(MC_SUSPEND_EVENT, &gpVosSchedContext->mcEventFlag))
-          vos_wd_detect_thread_stuck();
-        else
-          VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO,
-                    "%s: controller thread %s id: %d is suspended do not attemp probing",
-                    __func__, current->comm, current->pid);
+       if (gpVosSchedContext &&
+           !test_bit(MC_SUSPEND_EVENT, &gpVosSchedContext->mcEventFlag))
+            vos_wd_detect_thread_stuck();
+       else
+            VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO,
+               "%s: controller thread %s id: %d is suspended do not attemp probing",
+               __func__, current->comm, current->pid);
         /*
          * Process here and return without processing any SSR
          * related logic.

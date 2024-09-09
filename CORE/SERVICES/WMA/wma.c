@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022,2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -7203,6 +7204,7 @@ static int wma_csa_offload_handler(void *handle, u_int8_t *event, u_int32_t len)
 	struct ieee80211_extendedchannelswitch_ie *xcsa_ie;
 	struct ieee80211_ie_wide_bw_switch *wb_ie;
 	struct wma_txrx_node *intr = wma->interfaces;
+	tpAniSirGlobal mac_ctx;
 
 	param_buf = (WMI_CSA_HANDLING_EVENTID_param_tlvs *) event;
 
@@ -7277,6 +7279,16 @@ static int wma_csa_offload_handler(void *handle, u_int8_t *event, u_int32_t len)
 			 sub20width_ie.new_sub20_channelwidth);
 		csa_offload_event->new_sub20_channelwidth =
 			 sub20width_ie.new_sub20_channelwidth;
+	} else {
+		mac_ctx = (tpAniSirGlobal)vos_get_context(VOS_MODULE_ID_PE,
+							  wma->vos_context);
+		if (!mac_ctx) {
+			WMA_LOGE("%s: Invalid mac context", __func__);
+			return -EINVAL;
+		}
+
+		csa_offload_event->new_sub20_channelwidth =
+			mac_ctx->sub20_channelwidth;
 	}
 
 	csa_offload_event->ies_present_flag = csa_event->ies_present_flag;
@@ -10957,6 +10969,8 @@ static VOS_STATUS wma_set_mcc_channel_time_quota
 	struct sAniSirGlobal *pMac = NULL;
 	wmi_resmgr_set_chan_time_quota_cmd_fixed_param *cmdTQ = NULL;
 	wmi_resmgr_chan_time_quota chan_quota;
+	u_int32_t channel1 = adapter_1_chan_number;
+	u_int32_t channel2 = adapter_2_chan_number;
 	u_int32_t quota_chan1 = adapter_1_quota;
 	/* Knowing quota of 1st chan., derive quota for 2nd chan. */
 	u_int32_t quota_chan2 = 100 - quota_chan1;
@@ -10967,8 +10981,8 @@ static VOS_STATUS wma_set_mcc_channel_time_quota
 
 	WMA_LOGD("%s: Channel1:%d, freq1:%dMHz, Quota1:%dms, "
 		"Channel2:%d, freq2:%dMHz, Quota2:%dms", __func__,
-		adapter_1_chan_number, chan1_freq, quota_chan1,
-		adapter_2_chan_number, chan2_freq, quota_chan2);
+		channel1, chan1_freq, quota_chan1, channel2, chan2_freq,
+		quota_chan2);
 
 	if (!wma) {
 		WMA_LOGE("%s:NULL wma ptr. Exiting", __func__);
@@ -24805,7 +24819,6 @@ static inline void wma_free_wow_ptrn(tp_wma_handle wma, u_int8_t ptrn_id)
 }
 
 /* Converts wow wakeup reason code to text format */
-#ifdef WLAN_DEBUG
 static const u8 *wma_wow_wake_reason_str(A_INT32 wake_reason, tp_wma_handle wma)
 {
 	switch (wake_reason) {
@@ -24906,7 +24919,6 @@ static const u8 *wma_wow_wake_reason_str(A_INT32 wake_reason, tp_wma_handle wma)
 
 	return "unknown";
 }
-#endif
 
 static void wma_beacon_miss_handler(tp_wma_handle wma, u_int32_t vdev_id,
 				    uint32_t rssi)
@@ -26800,7 +26812,6 @@ static inline int wma_get_wow_bus_suspend(tp_wma_handle wma) {
 	return adf_os_atomic_read(&wma->is_wow_bus_suspended);
 }
 
-#ifdef WLAN_DEBUG
 static const u8 *wma_wow_wakeup_event_str(WOW_WAKE_EVENT_TYPE event)
 {
 	switch (event) {
@@ -26874,7 +26885,6 @@ static const u8 *wma_wow_wakeup_event_str(WOW_WAKE_EVENT_TYPE event)
 		return "UNSPECIFIED_EVENT";
 	}
 }
-#endif
 
 /**
  * wma_add_wow_wakeup_event() - Update WOW wakeup event masks
@@ -27912,11 +27922,15 @@ static VOS_STATUS wma_feed_allowed_action_frame_patterns(tp_wma_handle wma)
 	cmd->operation = wma->allowed_action_frames.operation;
 
 	for (i = 0; i < MAX_SUPPORTED_ACTION_CATEGORY_ELE_LIST; i++) {
+#ifdef FEATURE_PBM_MAGIC_WOW
+		cmd->action_category_map[i] = 0;
+#else
 		if (i < (SIR_MAC_ACTION_MAX / 32))
 			cmd->action_category_map[i] =
 			     wma->allowed_action_frames.action_category_map[i];
 		else
 			cmd->action_category_map[i] = 0;
+#endif
 
 		WMA_LOGD("%s: %d action Wakeup pattern 0x%x in fw",
 			__func__, i, cmd->action_category_map[i]);

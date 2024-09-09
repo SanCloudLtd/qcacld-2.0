@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2013-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022,2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -94,8 +95,12 @@ static u_int32_t refclk_speed_to_hz[] = {
 
 #ifdef MULTI_IF_NAME
 #define PREFIX MULTI_IF_NAME "/"
+#define PREFIX_QCA9377  MULTI_IF_NAME "/"
+#define PREFIX_QCA6174  MULTI_IF_NAME "/"
 #else
 #define PREFIX ""
+#define PREFIX_QCA9377 "qca9377/"
+#define PREFIX_QCA6174 "qca6174/"
 #endif
 
 static struct ol_fw_files FW_FILES_QCA6174_FW_1_1 = {
@@ -114,10 +119,15 @@ static struct ol_fw_files FW_FILES_QCA6174_FW_1_3 = {
 	PREFIX "utfbd13.bin", PREFIX "qsetup13.bin",
 	PREFIX "epping13.bin"};
 static struct ol_fw_files FW_FILES_QCA6174_FW_3_0 = {
-	PREFIX "qwlan30.bin", PREFIX "qwlan30i.bin", PREFIX "bdwlan30.bin",
-	PREFIX "otp30.bin", PREFIX "utf30.bin",
-	PREFIX "utfbd30.bin", PREFIX "qsetup30.bin",
-	PREFIX "epping30.bin"};
+	PREFIX_QCA6174 "qwlan30.bin", PREFIX_QCA6174 "qwlan30i.bin", PREFIX_QCA6174 "bdwlan30.bin",
+	PREFIX_QCA6174 "otp30.bin", PREFIX_QCA6174 "utf30.bin",
+	PREFIX_QCA6174 "utfbd30.bin", PREFIX_QCA6174 "qsetup30.bin",
+	PREFIX_QCA6174 "epping30.bin"};
+static struct ol_fw_files FW_FILES_QCA9377_FW_3_0 = {
+	PREFIX_QCA9377 "qwlan30.bin", PREFIX_QCA9377 "qwlan30i.bin", PREFIX_QCA9377 "bdwlan30.bin",
+	PREFIX_QCA9377 "otp30.bin", PREFIX_QCA9377 "utf30.bin",
+	PREFIX_QCA9377 "utfbd30.bin", PREFIX_QCA9377 "qsetup30.bin",
+	PREFIX_QCA9377 "epping30.bin"};
 static struct ol_fw_files FW_FILES_DEFAULT = {
 	PREFIX "qwlan.bin", "", PREFIX "bdwlan.bin",
 	PREFIX "otp.bin", PREFIX "utf.bin",
@@ -152,7 +162,7 @@ static int ol_get_fw_files_for_target(struct ol_fw_files *pfw_files,
 #ifdef CONFIG_TUFELLO_DUAL_FW_SUPPORT
             memcpy(pfw_files, &FW_FILES_DEFAULT, sizeof(*pfw_files));
 #else
-            memcpy(pfw_files, &FW_FILES_QCA6174_FW_3_0, sizeof(*pfw_files));
+            memcpy(pfw_files, &FW_FILES_QCA9377_FW_3_0, sizeof(*pfw_files));
 #endif
             break;
     default:
@@ -167,14 +177,24 @@ static int ol_get_fw_files_for_target(struct ol_fw_files *pfw_files,
 #ifdef FW_RAM_DUMP_TO_FILE
 #define GET_INODE_FROM_FILEP(filp) ((filp)->f_path.dentry->d_inode)
 
+#if (defined(__ANDROID_COMMON_KERNEL__) && \
+	(LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0)))
+int _readwrite_file(const char *filename, char *rbuf,
+	const char *wbuf, size_t length, int mode)
+{
+	return -ENOTSUPP;
+}
+#else
 int _readwrite_file(const char *filename, char *rbuf,
 	const char *wbuf, size_t length, int mode)
 {
 	int ret = 0;
 	struct file *filp = (struct file *)-ENOENT;
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0)) || (defined(CONFIG_SET_FS))
 	mm_segment_t oldfs;
 	oldfs = get_fs();
 	set_fs(KERNEL_DS);
+#endif
 
 	do {
 		filp = filp_open(filename, mode, S_IRUSR);
@@ -229,9 +249,12 @@ int _readwrite_file(const char *filename, char *rbuf,
 	if (!IS_ERR(filp))
 		filp_close(filp, NULL);
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0)) || (defined(CONFIG_SET_FS))
 	set_fs(oldfs);
+#endif
 	return ret;
 }
+#endif
 
 #define CRASH_DUMP_PATH "/var/"
 #define CRASH_DUMP_FILE "/var/cld_fwcrash.log"
@@ -460,15 +483,9 @@ static ssize_t crash_dump_read(struct file *file, char __user *buf,
  * This structure initialize the file operation handle for crash
  * dump feature
  */
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,6,0)
-static const struct proc_ops crash_dump_fops = {
-	proc_read: crash_dump_read
-};
-#else
 static const struct file_operations crash_dump_fops = {
 	read: crash_dump_read
 };
-#endif
 
 /**
  * crash_dump_procfs_remove() - Remove file/dir under procfs for crash dump

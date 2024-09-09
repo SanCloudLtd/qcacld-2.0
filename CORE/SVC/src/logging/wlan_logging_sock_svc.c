@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2014-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -31,7 +32,7 @@
  ******************************************************************************/
 
 #ifdef WLAN_LOGGING_SOCK_SVC_ENABLE
-#include <linux/vmalloc.h>
+#include <vmalloc.h>
 #include <wlan_nlink_srv.h>
 #include <vos_status.h>
 #include <vos_trace.h>
@@ -39,7 +40,7 @@
 #include <wlan_logging_sock_svc.h>
 #include <vos_types.h>
 #include <vos_trace.h>
-#include <linux/kthread.h>
+#include <kthread.h>
 #include <adf_os_time.h>
 #include "pktlog_ac.h"
 #include <linux/rtc.h>
@@ -272,7 +273,6 @@ static int wlan_queue_logmsg_for_app(void)
 	return ret;
 }
 
-
 int wlan_log_to_user(VOS_TRACE_LEVEL log_level, char *to_be_sent, int length)
 {
 	/* Add the current time stamp */
@@ -282,9 +282,18 @@ int wlan_log_to_user(VOS_TRACE_LEVEL log_level, char *to_be_sent, int length)
 	int total_log_len;
 	unsigned int *pfilled_length;
 	bool wake_up_thread = false;
+	/*
+	 * Kernel 5.0 removed do_gettimeofday, 5.6 removed "struct timeval"
+	 * so we directly use timespec64 the new style and API ktime_get_real_ts64
+	 * starting from 5.0
+	 */
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 0, 0))
 	struct timespec64 tv;
+#else
+	struct timeval tv;
+#endif
 	struct rtc_time tm;
-	time64_t local_time;
+	unsigned long local_time;
 	int radio;
 
 	radio = vos_get_radio_index();
@@ -310,14 +319,22 @@ int wlan_log_to_user(VOS_TRACE_LEVEL log_level, char *to_be_sent, int length)
 	} else {
 
 		/* Format the Log time R#: [hr:min:sec.microsec] */
-		ktime_get_real_ts64(&tv);
+		vos_timer_get_timeval(&tv);
 		/* Convert rtc to local time */
-		local_time = (u64)(tv.tv_sec - (sys_tz.tz_minuteswest * 60));
+		local_time = (u32)(tv.tv_sec - (sys_tz.tz_minuteswest * 60));
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 0, 0))
 		rtc_time64_to_tm(local_time, &tm);
+#else
+		rtc_time_to_tm(local_time, &tm);
+#endif
 		tlen = snprintf(tbuf, sizeof(tbuf),
 				"R%d: [%s][%02d:%02d:%02d.%06lu] ",
 				radio, current->comm, tm.tm_hour,
-				tm.tm_min, tm.tm_sec, tv.tv_nsec / 1000);
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 0, 0))
+				tm.tm_min, tm.tm_sec, tv.tv_nsec);
+#else
+				tm.tm_min, tm.tm_sec, tv.tv_usec);
+#endif
 
 		/* 1+1 indicate '\n'+'\0' */
 		total_log_len = length + tlen + 1 + 1;

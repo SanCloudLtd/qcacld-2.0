@@ -520,7 +520,7 @@ static ssize_t read_file_spectral_count(struct file *file,
 
 	spectral_count = spec->config.count;
 
-	len = sprintf(buf, "%d\n", spectral_count);
+	len = snprintf(buf, sizeof(buf), "%d\n", spectral_count);
 	return simple_read_from_buffer(user_buf, count, ppos, buf, len);
 }
 
@@ -572,7 +572,7 @@ static ssize_t read_file_spectral_bins(struct file *file,
 	bin_scale = HDD_SPECTRAL_BIN_SCALE_DEFAULT;
 	bins = 1 << (fft_size - bin_scale);
 
-	len = sprintf(buf, "%d\n", bins);
+	len = snprintf(buf, sizeof(buf), "%d\n", bins);
 	return simple_read_from_buffer(user_buf, count, ppos, buf, len);
 }
 

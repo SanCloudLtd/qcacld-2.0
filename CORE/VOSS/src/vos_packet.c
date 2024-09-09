@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2012-2014, 2016, 2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -349,7 +350,11 @@ void vos_pkt_trace_buf_update
    adf_os_spin_unlock_bh(&trace_buffer_lock);
    ktime_get_real_ts64(&tv);
    trace_buffer[slot].event_sec_time = tv.tv_sec;
-   trace_buffer[slot].event_msec_time = tv.tv_nsec / 1000;
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 0, 0))
+   trace_buffer[slot].event_msec_time = do_div(tv.tv_nsec, NSEC_PER_MSEC);
+#else
+   trace_buffer[slot].event_msec_time = tv.tv_usec;
+#endif
    strlcpy(trace_buffer[slot].event_string, event_string,
           sizeof(trace_buffer[slot].event_string));
 

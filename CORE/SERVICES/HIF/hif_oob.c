@@ -118,7 +118,7 @@ int hif_oob_claim_irq(oob_irq_handler_t handler, HIF_DEVICE *hif_device)
 #else
 		sched_setscheduler(hif_oob->oob_task, SCHED_FIFO,
 				   &param);
-#endif
+#endif		
 		wake_up_process(hif_oob->oob_task);
 		up(&hif_oob->oob_sem);
 		AR_DEBUG_PRINTF(ATH_DEBUG_INFO, ("start oob task"));

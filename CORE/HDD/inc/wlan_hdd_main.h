@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -2823,4 +2824,43 @@ hdd_wlan_nla_put_u64(struct sk_buff *skb, int attrtype, u64 value)
 				 QCA_WLAN_VENDOR_ATTR_LL_STATS_PAD);
 }
 #endif
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 12, 0)
+static inline int wlan_cfg80211_register_netdevice(struct net_device *dev)
+{
+	return cfg80211_register_netdevice(dev);
+}
+
+static inline void wlan_cfg80211_unregister_netdevice(struct net_device *dev)
+{
+	cfg80211_unregister_netdevice(dev);
+}
+#else
+static inline int wlan_cfg80211_register_netdevice(struct net_device *dev)
+{
+	return register_netdevice(dev);
+}
+
+static inline void wlan_cfg80211_unregister_netdevice(struct net_device *dev)
+{
+	unregister_netdevice(dev);
+}
+#endif
+
+/**
+ * hdd_chan_change_notify() - Function to notify cfg80211 about channel change
+ * @adapter: adapter
+ * @dev: Net device structure
+ * @oper_chan: New operating channel
+ * @eCsrPhyMode: phy mode
+ *
+ * This function is used to notify cfg80211 about the channel change
+ *
+ * Return: Success on intimating userspace
+ *
+ */
+VOS_STATUS hdd_chan_change_notify(hdd_adapter_t *adapter,
+				  struct net_device *dev,
+				  uint8_t oper_chan,
+				  eCsrPhyMode phy_mode);
 #endif    // end #if !defined( WLAN_HDD_MAIN_H )
